@@ -18,6 +18,7 @@ smol/
 └── scripts/
     ├── bootstrap.sh
     ├── build-sk-cheesecake-nrf-p00.sh
+    ├── clean-sk-cheesecake-nrf-p00.sh
     └── update-sources.sh
 ```
 
@@ -152,6 +153,31 @@ SHA256SUMS
 `app-merged.hex` 是 west sysbuild 生成的合并 HEX；日常 UF2 更新通常使用
 `app.uf2`。bootloader 产物包含 MBR，优先使用 `bootloader_mbr.uf2` 或
 `bootloader_mbr.hex`。脚本不会复制具有异常大逻辑尺寸的 `bootloader.bin`。
+
+## 清理 sk_cheesecake_nrf_p00 构建文件
+
+先预览将被删除的目录：
+
+```bash
+./scripts/clean-sk-cheesecake-nrf-p00.sh --dry-run
+```
+
+确认后清理：
+
+```bash
+./scripts/clean-sk-cheesecake-nrf-p00.sh
+```
+
+脚本直接删除以下内容：
+
+- 整个顶层 `build/`，包括所有板型的中间文件和 ccache；
+- 整个顶层 `artifacts/`，包括其中已有的 factory-test 和发布文件；
+- 旧流程产生的
+  `boot/Adafruit_nRF52_Bootloader/cmake-build-sk_cheesecake_nrf_p00/` 和
+  `tracker/SlimeVR-Tracker-nRF/build_sk_ck_p00/`。
+
+清理不可撤销。脚本不会删除源码子模块、west SDK、`.west` 元数据或 Python
+虚拟环境。不要在构建仍在运行时执行清理。
 
 ## Bootloader 构建
 
