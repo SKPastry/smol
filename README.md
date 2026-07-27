@@ -146,7 +146,8 @@ build/sk_cheesecake_nrf_p00/
 ├── app/                                      # app 中间构建目录
 ├── bootloader/                               # bootloader 中间构建目录
 ├── app.uf2                                   # USB 更新 app
-├── bootloader_mbr.uf2                        # bootloader 自升级
+├── update_bootloader.uf2                     # 已有 bootloader 的设备自升级 BL
+├── bootloader_mbr.hex                        # SWD/J-Link 直接烧录 MBR + BL
 ├── sk_cheesecake_nrf_p00_factory_test.hex    # SWD/J-Link 工厂固件
 └── SHA256SUMS
 ```
@@ -158,10 +159,16 @@ factory HEX 按 tracker 子模块的
 并集、App 向量表、UICR 地址，以及 BL 暂存区、NVS、MBR 参数页和 settings 页
 保持为空；任何检查失败都不会发布 factory HEX。
 
-`app.uf2` 用于已经安装 bootloader 的设备通过 USB 更新 app；
-`bootloader_mbr.uf2` 用于 bootloader 自升级；factory HEX 只能用于通过
-SWD/J-Link 全片擦除后的首次或工厂烧录。这三种产物不能互相替代。脚本不会复制
-具有异常大逻辑尺寸的 `bootloader.bin`。
+`app.uf2` 用于已经安装 bootloader 的设备通过 USB 更新 app。
+`update_bootloader.uf2` 是构建产物 `bootloader_mbr.uf2` 的顶层重命名副本，只能
+交给已经运行兼容 bootloader 的设备执行 BL 自升级，不能用于空片首次烧录。
+
+`bootloader_mbr.hex` 包含 MBR、bootloader 和必要的 UICR 数据，可通过
+SWD/J-Link 直接烧录空片，但不包含 app；只烧录这个文件后，设备会停留在
+bootloader，随后还需安装 app。需要一次完成新板初始化时，应全片擦除后烧录同时
+包含 MBR、bootloader 与 app 的 `sk_cheesecake_nrf_p00_factory_test.hex`。
+
+这些产物不能互相替代。脚本不会复制具有异常大逻辑尺寸的 `bootloader.bin`。
 
 ## 清理 sk_cheesecake_nrf_p00 构建文件
 
@@ -207,7 +214,9 @@ cmake --build build/bootloader/sk_cheesecake_nrf_p00 --parallel
 现有构建目录如果已经缓存 `.venv-bootloader/bin/python`，仍可直接增量构建。
 CMake 构建目录包含绝对路径，不应提交或复制到其他 clone。
 
-发布或烧录应优先使用 `bootloader_mbr.hex` 或 `bootloader_mbr.uf2`。
+直接通过 SWD/J-Link 烧录 bootloader 应使用 `bootloader_mbr.hex`。原始
+`bootloader_mbr.uf2` 用于已有兼容 bootloader 的设备自升级，在外层构建目录中
+会命名为 `update_bootloader.uf2`，以免与空片烧录固件混淆。
 `bootloader.bin` 可能因为 ELF 中的高地址 UICR 段具有很大的逻辑文件尺寸，
 即使它在支持稀疏文件的文件系统上只占用少量实际空间。
 

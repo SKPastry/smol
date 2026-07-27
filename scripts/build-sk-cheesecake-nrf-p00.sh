@@ -13,9 +13,11 @@ readonly APP_BUILD_DIR="${BUILD_DIR}/app"
 readonly BOOTLOADER_BUILD_DIR="${BUILD_DIR}/bootloader"
 readonly MERGEHEX_SCRIPT="${APP_WORKSPACE_DIR}/zephyr/scripts/build/mergehex.py"
 readonly APP_UF2="${BUILD_DIR}/app.uf2"
-readonly BOOTLOADER_UF2="${BUILD_DIR}/bootloader_mbr.uf2"
+readonly UPDATE_BOOTLOADER_UF2="${BUILD_DIR}/update_bootloader.uf2"
+readonly BOOTLOADER_HEX="${BUILD_DIR}/bootloader_mbr.hex"
 readonly FACTORY_HEX="${BUILD_DIR}/sk_cheesecake_nrf_p00_factory_test.hex"
 readonly CHECKSUM_FILE="${BUILD_DIR}/SHA256SUMS"
+readonly LEGACY_BOOTLOADER_UF2="${BUILD_DIR}/bootloader_mbr.uf2"
 readonly APP_BOARD="sk_cheesecake_nrf_p00/nrf52840/uf2"
 readonly BOOTLOADER_BOARD="sk_cheesecake_nrf_p00"
 readonly EXPECTED_NCS_SERIES="v3.2"
@@ -28,8 +30,8 @@ usage() {
 Usage: ./scripts/build-sk-cheesecake-nrf-p00.sh [--pristine]
 
 Build the sk_cheesecake_nrf_p00 tracker application and bootloader, then
-place the app UF2, bootloader UF2, and merged factory HEX directly under
-build/sk_cheesecake_nrf_p00.
+place the app UF2, bootloader update UF2, directly flashable bootloader HEX,
+and merged factory HEX directly under build/sk_cheesecake_nrf_p00.
 
 The workspace, west projects, Python environments, and compiler toolchains
 must already be initialized.
@@ -426,14 +428,17 @@ stage_firmware_outputs() {
     fi
 
     cp -- "${app_source_uf2}" "${APP_UF2}"
-    cp -- "${bootloader_source_uf2}" "${BOOTLOADER_UF2}"
+    cp -- "${bootloader_source_uf2}" "${UPDATE_BOOTLOADER_UF2}"
+    cp -- "${bootloader_source_hex}" "${BOOTLOADER_HEX}"
     mv -f -- "${factory_temp}" "${FACTORY_HEX}"
+    rm -f -- "${LEGACY_BOOTLOADER_UF2}"
 
     (
         cd "${BUILD_DIR}"
         sha256sum \
             "${APP_UF2##*/}" \
-            "${BOOTLOADER_UF2##*/}" \
+            "${UPDATE_BOOTLOADER_UF2##*/}" \
+            "${BOOTLOADER_HEX##*/}" \
             "${FACTORY_HEX##*/}" \
             >"${CHECKSUM_FILE##*/}"
     )
@@ -443,7 +448,8 @@ stage_firmware_outputs() {
         cd "${BUILD_DIR}"
         du -h \
             "${APP_UF2##*/}" \
-            "${BOOTLOADER_UF2##*/}" \
+            "${UPDATE_BOOTLOADER_UF2##*/}" \
+            "${BOOTLOADER_HEX##*/}" \
             "${FACTORY_HEX##*/}" \
             "${CHECKSUM_FILE##*/}"
     )
