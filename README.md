@@ -138,21 +138,30 @@ NCS_TOOLCHAIN_ROOT=/path/to/ncs/toolchain \
 已安装的 NCS Toolchain。app 的 ccache 默认放在
 `build/sk_cheesecake_nrf_p00/.ccache`，不会依赖用户目录可写。
 
-中间构建文件位于 `build/sk_cheesecake_nrf_p00/`。成功后可烧录或发布的文件
-统一复制到 `artifacts/sk_cheesecake_nrf_p00/`：
+外层脚本只构建 app 的 `uf2` 变体，不构建同一板定义下的其他变体。中间构建
+目录与最终固件都位于 `build/sk_cheesecake_nrf_p00/`：
 
 ```text
-app.uf2
-app.hex
-app-merged.hex
-bootloader_mbr.uf2
-bootloader_mbr.hex
-SHA256SUMS
+build/sk_cheesecake_nrf_p00/
+├── app/                                      # app 中间构建目录
+├── bootloader/                               # bootloader 中间构建目录
+├── app.uf2                                   # USB 更新 app
+├── bootloader_mbr.uf2                        # bootloader 自升级
+├── sk_cheesecake_nrf_p00_factory_test.hex    # SWD/J-Link 工厂固件
+└── SHA256SUMS
 ```
 
-`app-merged.hex` 是 west sysbuild 生成的合并 HEX；日常 UF2 更新通常使用
-`app.uf2`。bootloader 产物包含 MBR，优先使用 `bootloader_mbr.uf2` 或
-`bootloader_mbr.hex`。脚本不会复制具有异常大逻辑尺寸的 `bootloader.bin`。
+factory HEX 按 tracker 子模块的
+`doc/sk_cheesecake_nrf_p00_factory_firmware.md` 生成：使用 Zephyr
+`mergehex.py --overlap=error` 合并 app `zephyr.hex` 与
+`bootloader_mbr.hex`。合并后脚本会检查输入地址不重叠、输出逐字节等于输入
+并集、App 向量表、UICR 地址，以及 BL 暂存区、NVS、MBR 参数页和 settings 页
+保持为空；任何检查失败都不会发布 factory HEX。
+
+`app.uf2` 用于已经安装 bootloader 的设备通过 USB 更新 app；
+`bootloader_mbr.uf2` 用于 bootloader 自升级；factory HEX 只能用于通过
+SWD/J-Link 全片擦除后的首次或工厂烧录。这三种产物不能互相替代。脚本不会复制
+具有异常大逻辑尺寸的 `bootloader.bin`。
 
 ## 清理 sk_cheesecake_nrf_p00 构建文件
 

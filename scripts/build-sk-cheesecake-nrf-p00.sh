@@ -11,7 +11,11 @@ readonly BOOTLOADER_PYTHON="${ROOT_DIR}/.venv-bootloader/bin/python"
 readonly BUILD_DIR="${ROOT_DIR}/build/sk_cheesecake_nrf_p00"
 readonly APP_BUILD_DIR="${BUILD_DIR}/app"
 readonly BOOTLOADER_BUILD_DIR="${BUILD_DIR}/bootloader"
-readonly ARTIFACT_DIR="${ROOT_DIR}/artifacts/sk_cheesecake_nrf_p00"
+readonly MERGEHEX_SCRIPT="${APP_WORKSPACE_DIR}/zephyr/scripts/build/mergehex.py"
+readonly APP_UF2="${BUILD_DIR}/app.uf2"
+readonly BOOTLOADER_UF2="${BUILD_DIR}/bootloader_mbr.uf2"
+readonly FACTORY_HEX="${BUILD_DIR}/sk_cheesecake_nrf_p00_factory_test.hex"
+readonly CHECKSUM_FILE="${BUILD_DIR}/SHA256SUMS"
 readonly APP_BOARD="sk_cheesecake_nrf_p00/nrf52840/uf2"
 readonly BOOTLOADER_BOARD="sk_cheesecake_nrf_p00"
 readonly EXPECTED_NCS_SERIES="v3.2"
@@ -24,7 +28,8 @@ usage() {
 Usage: ./scripts/build-sk-cheesecake-nrf-p00.sh [--pristine]
 
 Build the sk_cheesecake_nrf_p00 tracker application and bootloader, then
-collect the flashable HEX/UF2 files under artifacts/sk_cheesecake_nrf_p00.
+place the app UF2, bootloader UF2, and merged factory HEX directly under
+build/sk_cheesecake_nrf_p00.
 
 The workspace, west projects, Python environments, and compiler toolchains
 must already be initialized.
@@ -233,6 +238,8 @@ require_initialized_workspace() {
         die "tracker west workspace is missing; run ./scripts/bootstrap.sh first"
     [[ -f "${APP_WORKSPACE_DIR}/zephyr/CMakeLists.txt" ]] ||
         die "tracker west projects are incomplete; run ./scripts/bootstrap.sh"
+    [[ -f "${MERGEHEX_SCRIPT}" ]] ||
+        die "Zephyr mergehex tool is missing: ${MERGEHEX_SCRIPT}"
     [[ -d "${APP_DIR}/boards/crazt/sk_cheesecake_nrf_p00" ]] ||
         die "tracker board definition is missing: ${APP_BOARD}"
     [[ -d "${BOOTLOADER_DIR}/src/boards/sk_cheesecake_nrf_p00" ]] ||
@@ -290,50 +297,155 @@ build_bootloader() {
     )
 }
 
-collect_artifacts() {
+validate_factory_firmware() {
+    local bootloader_hex="$1"
+    local app_hex="$2"
+    local factory_hex="$3"
+
+    env -u PYTHONHOME -u PYTHONPATH \
+        "${BOOTLOADER_PYTHON}" \
+        - "${bootloader_hex}" "${app_hex}" "${factory_hex}" <<'PY'
+from intelhex import IntelHex
+import sys
+
+boot = IntelHex(sys.argv[1])
+app = IntelHex(sys.argv[2])
+factory = IntelHex(sys.argv[3])
+
+boot_addrs = set(boot.addresses())
+app_addrs = set(app.addresses())
+factory_addrs = set(factory.addresses())
+
+assert boot_addrs, "Bootloader HEX 没有数据"
+assert app_addrs, "App HEX 没有数据"
+assert boot_addrs.isdisjoint(app_addrs), "Bootloader 和 App 地址重叠"
+assert factory_addrs == boot_addrs | app_addrs, "输出地址集合不是输入并集"
+assert all(factory[address] == boot[address] for address in boot_addrs), (
+    "Bootloader 数据被改变"
+)
+assert all(factory[address] == app[address] for address in app_addrs), (
+    "App 数据被改变"
+)
+
+app_first = min(app_addrs)
+app_last = max(app_addrs)
+assert app_first == 0x1000, hex(app_first)
+assert app_last < 0xE0000, hex(app_last)
+
+stack_pointer = int.from_bytes(
+    bytes(app[address] for address in range(0x1000, 0x1004)), "little"
+)
+reset_handler = int.from_bytes(
+    bytes(app[address] for address in range(0x1004, 0x1008)), "little"
+)
+assert 0x20000000 <= stack_pointer < 0x20040000, hex(stack_pointer)
+assert reset_handler & 1, hex(reset_handler)
+assert app_first <= (reset_handler & ~1) <= app_last, hex(reset_handler)
+
+assert 0xF4000 in boot_addrs, "Bootloader 未从 0xF4000 开始"
+boot_address = int.from_bytes(
+    bytes(factory[address] for address in range(0x10001014, 0x10001018)),
+    "little",
+)
+mbr_parameter_address = int.from_bytes(
+    bytes(factory[address] for address in range(0x10001018, 0x1000101C)),
+    "little",
+)
+assert boot_address == 0xF4000, hex(boot_address)
+assert mbr_parameter_address == 0xFE000, hex(mbr_parameter_address)
+
+assert not any(
+    0xE0000 <= address < 0xEA000 for address in factory_addrs
+), "BL 暂存区非空"
+assert not any(
+    0xEE000 <= address < 0xF4000 for address in factory_addrs
+), "NVS 非空"
+assert not any(
+    0xFE000 <= address < 0xFF000 for address in factory_addrs
+), "MBR 参数页非空"
+assert not any(
+    0xFF000 <= address < 0x100000 for address in factory_addrs
+), "settings 页非空"
+
+print("Boot segments:", [(hex(start), hex(end)) for start, end in boot.segments()])
+print("App segments:", [(hex(start), hex(end)) for start, end in app.segments()])
+print(
+    "Factory segments:",
+    [(hex(start), hex(end)) for start, end in factory.segments()],
+)
+print(
+    f"App vector: SP=0x{stack_pointer:08X}, "
+    f"reset=0x{reset_handler:08X}"
+)
+print(
+    f"UICR: boot=0x{boot_address:X}, "
+    f"mbr_params=0x{mbr_parameter_address:X}"
+)
+print("ALL STATIC CHECKS PASSED")
+PY
+}
+
+stage_firmware_outputs() {
     local app_image_dir="${APP_BUILD_DIR}/SlimeVR-Tracker-nRF/zephyr"
+    local app_source_uf2="${app_image_dir}/zephyr.uf2"
+    local app_source_hex="${app_image_dir}/zephyr.hex"
+    local bootloader_source_uf2="${BOOTLOADER_BUILD_DIR}/bootloader_mbr.uf2"
+    local bootloader_source_hex="${BOOTLOADER_BUILD_DIR}/bootloader_mbr.hex"
+    local factory_temp
     local source
     local required_sources=(
-        "${app_image_dir}/zephyr.uf2"
-        "${app_image_dir}/zephyr.hex"
-        "${APP_BUILD_DIR}/merged.hex"
-        "${BOOTLOADER_BUILD_DIR}/bootloader_mbr.uf2"
-        "${BOOTLOADER_BUILD_DIR}/bootloader_mbr.hex"
+        "${app_source_uf2}"
+        "${app_source_hex}"
+        "${bootloader_source_uf2}"
+        "${bootloader_source_hex}"
     )
-    local artifact_names=(
-        "app.uf2"
-        "app.hex"
-        "app-merged.hex"
-        "bootloader_mbr.uf2"
-        "bootloader_mbr.hex"
-    )
-    local index
 
     for source in "${required_sources[@]}"; do
-        [[ -s "${source}" ]] || die "expected build artifact is missing: ${source}"
+        [[ -s "${source}" ]] ||
+            die "expected build artifact is missing: ${source}"
     done
 
-    mkdir -p "${ARTIFACT_DIR}"
-    for index in "${!required_sources[@]}"; do
-        cp -- \
-            "${required_sources[index]}" \
-            "${ARTIFACT_DIR}/${artifact_names[index]}"
-    done
+    factory_temp="$(mktemp "${BUILD_DIR}/.factory.XXXXXXXX.hex")"
+    if ! env -u PYTHONHOME -u PYTHONPATH \
+        "${BOOTLOADER_PYTHON}" \
+        "${MERGEHEX_SCRIPT}" \
+        --overlap=error \
+        -o "${factory_temp}" \
+        "${bootloader_source_hex}" \
+        "${app_source_hex}"; then
+        rm -f -- "${factory_temp}"
+        die "factory firmware merge failed"
+    fi
+
+    if ! validate_factory_firmware \
+        "${bootloader_source_hex}" \
+        "${app_source_hex}" \
+        "${factory_temp}"; then
+        rm -f -- "${factory_temp}"
+        die "factory firmware static validation failed"
+    fi
+
+    cp -- "${app_source_uf2}" "${APP_UF2}"
+    cp -- "${bootloader_source_uf2}" "${BOOTLOADER_UF2}"
+    mv -f -- "${factory_temp}" "${FACTORY_HEX}"
 
     (
-        cd "${ARTIFACT_DIR}"
-        sha256sum "${artifact_names[@]}" >SHA256SUMS
+        cd "${BUILD_DIR}"
+        sha256sum \
+            "${APP_UF2##*/}" \
+            "${BOOTLOADER_UF2##*/}" \
+            "${FACTORY_HEX##*/}" \
+            >"${CHECKSUM_FILE##*/}"
     )
 
-    log "artifacts:"
+    log "firmware outputs:"
     (
-        cd "${ROOT_DIR}"
+        cd "${BUILD_DIR}"
         du -h \
-            "artifacts/sk_cheesecake_nrf_p00/app.uf2" \
-            "artifacts/sk_cheesecake_nrf_p00/app.hex" \
-            "artifacts/sk_cheesecake_nrf_p00/app-merged.hex" \
-            "artifacts/sk_cheesecake_nrf_p00/bootloader_mbr.uf2" \
-            "artifacts/sk_cheesecake_nrf_p00/bootloader_mbr.hex"
+            "${APP_UF2##*/}" \
+            "${BOOTLOADER_UF2##*/}" \
+            "${FACTORY_HEX##*/}" \
+            "${CHECKSUM_FILE##*/}"
     )
 }
 
@@ -343,9 +455,10 @@ require_command cmake
 require_command ninja
 require_command arm-none-eabi-gcc
 require_command sha256sum
+require_command mktemp
 require_initialized_workspace
 build_application
 build_bootloader
-collect_artifacts
+stage_firmware_outputs
 
-log "build complete: ${ARTIFACT_DIR}"
+log "build complete: ${BUILD_DIR}"
