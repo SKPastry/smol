@@ -7,8 +7,6 @@ readonly ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 readonly TARGETS=(
     "${ROOT_DIR}/build"
     "${ROOT_DIR}/artifacts"
-    "${ROOT_DIR}/boot/Adafruit_nRF52_Bootloader/cmake-build-sk_cheesecake_nrf_p00"
-    "${ROOT_DIR}/tracker/SlimeVR-Tracker-nRF/build_sk_ck_p00"
 )
 
 DRY_RUN=0
@@ -17,8 +15,7 @@ usage() {
     cat <<'EOF'
 Usage: ./scripts/clean-sk-cheesecake-nrf-p00.sh [--dry-run]
 
-Remove all top-level build outputs and collected artifacts, together with the
-known legacy sk_cheesecake_nrf_p00 app and bootloader build directories.
+Remove all top-level build outputs and collected artifacts.
 
 Options:
   --dry-run    Show the directories that would be removed without deleting them.
@@ -69,9 +66,7 @@ require_safe_target() {
 
     case "${target}" in
         "${ROOT_DIR}/build" | \
-        "${ROOT_DIR}/artifacts" | \
-        "${ROOT_DIR}/boot/Adafruit_nRF52_Bootloader/cmake-build-sk_cheesecake_nrf_p00" | \
-        "${ROOT_DIR}/tracker/SlimeVR-Tracker-nRF/build_sk_ck_p00")
+        "${ROOT_DIR}/artifacts")
             ;;
         *)
             die "refusing to remove unexpected path: ${target}"

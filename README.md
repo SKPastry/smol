@@ -171,13 +171,11 @@ SHA256SUMS
 脚本直接删除以下内容：
 
 - 整个顶层 `build/`，包括所有板型的中间文件和 ccache；
-- 整个顶层 `artifacts/`，包括其中已有的 factory-test 和发布文件；
-- 旧流程产生的
-  `boot/Adafruit_nRF52_Bootloader/cmake-build-sk_cheesecake_nrf_p00/` 和
-  `tracker/SlimeVR-Tracker-nRF/build_sk_ck_p00/`。
+- 整个顶层 `artifacts/`，包括其中已有的 factory-test 和发布文件。
 
 清理不可撤销。脚本不会删除源码子模块、west SDK、`.west` 元数据或 Python
-虚拟环境。不要在构建仍在运行时执行清理。
+虚拟环境，也不会处理子模块内部的任何构建目录。不要在构建仍在运行时执行
+清理。
 
 ## Bootloader 构建
 
