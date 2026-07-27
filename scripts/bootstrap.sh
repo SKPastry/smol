@@ -4,7 +4,8 @@ set -Eeuo pipefail
 
 readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
-readonly VENV_DIR="${ROOT_DIR}/.venv"
+readonly WEST_VENV_DIR="${ROOT_DIR}/.venv-west"
+readonly BOOTLOADER_VENV_DIR="${ROOT_DIR}/.venv-bootloader"
 
 UPDATE_SDK=1
 
@@ -12,8 +13,9 @@ usage() {
     cat <<'EOF'
 Usage: ./scripts/bootstrap.sh [--init-only]
 
-Initialize all Git submodules, the Python virtual environment, and both west
-workspaces. By default, SDK repositories are also downloaded or updated.
+Initialize all Git submodules, the west and bootloader Python environments,
+and both west workspaces. By default, SDK repositories are also downloaded
+or updated.
 
 Options:
   --init-only  Initialize west metadata without downloading/updating SDK repos.
@@ -76,17 +78,27 @@ log "initializing tracker dependencies recursively"
 git -C tracker/SlimeVR-Tracker-nRF submodule sync --recursive
 git -C tracker/SlimeVR-Tracker-nRF submodule update --init --recursive
 
-if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
-    log "creating Python virtual environment"
-    python3 -m venv "${VENV_DIR}"
+if [[ ! -x "${WEST_VENV_DIR}/bin/python" ]]; then
+    log "creating west Python virtual environment"
+    python3 -m venv "${WEST_VENV_DIR}"
 fi
 
-log "installing Python workspace tools"
-"${VENV_DIR}/bin/python" -m pip install \
+log "installing west workspace tools"
+"${WEST_VENV_DIR}/bin/python" -m pip install \
     --disable-pip-version-check \
-    --requirement "${ROOT_DIR}/requirements-bootstrap.txt"
+    --requirement "${ROOT_DIR}/requirements-west.txt"
 
-readonly WEST="${VENV_DIR}/bin/west"
+if [[ ! -x "${BOOTLOADER_VENV_DIR}/bin/python" ]]; then
+    log "creating bootloader Python virtual environment"
+    python3 -m venv "${BOOTLOADER_VENV_DIR}"
+fi
+
+log "installing bootloader Python tools"
+"${BOOTLOADER_VENV_DIR}/bin/python" -m pip install \
+    --disable-pip-version-check \
+    --requirement "${ROOT_DIR}/requirements-bootloader.txt"
+
+readonly WEST="${WEST_VENV_DIR}/bin/west"
 
 init_west_workspace() {
     local workspace_dir="$1"
@@ -131,4 +143,5 @@ else
     log "workspace metadata initialized; run this script without --init-only to download SDK repositories"
 fi
 
-log "activate Python tools with: source .venv/bin/activate"
+log "activate west tools with: source .venv-west/bin/activate"
+log "bootloader Python: .venv-bootloader/bin/python"

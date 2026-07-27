@@ -1,5 +1,7 @@
 # Local Python environments
+# Legacy combined environment
 .venv/
+.venv-west/
 .venv-bootloader/
 
 # Build and deployment outputs

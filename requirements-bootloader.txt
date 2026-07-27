@@ -1,5 +1,2 @@
-# Keep workspace initialization behavior reproducible.
-west==1.5.0
-
 # Required by the Adafruit nRF52 bootloader image generation scripts.
 intelhex==2.3.0

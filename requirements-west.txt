@@ -1,0 +1,2 @@
+# Keep west workspace initialization behavior reproducible.
+west==1.5.0
