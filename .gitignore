@@ -1,0 +1,32 @@
+# Local Python environments
+.venv/
+.venv-bootloader/
+
+# Build and deployment outputs
+artifacts/
+build/
+build-*/
+
+# west workspace metadata and managed projects
+recv/.west/
+recv/bootloader/
+recv/modules/
+recv/nrf/
+recv/nrfxlib/
+recv/test/
+recv/tools/
+recv/zephyr/
+
+tracker/.west/
+tracker/bootloader/
+tracker/modules/
+tracker/nrf/
+tracker/nrfxlib/
+tracker/test/
+tracker/tools/
+tracker/zephyr/
+
+# Editor and operating-system files
+.DS_Store
+*.swp
+*~
