@@ -17,6 +17,7 @@ smol/
 │   └── SlimeVR-Tracker-nRF/                # Git 子模块 + west manifest
 └── scripts/
     ├── bootstrap.sh
+    ├── build-sk-cheesecake-nrf-p00.sh
     └── update-sources.sh
 ```
 
@@ -99,9 +100,63 @@ Toolchain，也不会自动安装全部 NCS Python 依赖。
 旧的 `.venv` 不再由脚本使用，但仍保留在 `.gitignore` 中，方便已有工作区平滑
 迁移。初始化脚本不会自动删除它。
 
+## sk_cheesecake_nrf_p00 一键构建
+
+工作区、west SDK、`.venv-bootloader` 和编译器工具链初始化完成后，从顶层目录
+执行：
+
+```bash
+./scripts/build-sk-cheesecake-nrf-p00.sh
+```
+
+脚本依次构建以下两个目标：
+
+- tracker app：`sk_cheesecake_nrf_p00/nrf52840/uf2`
+- bootloader：`sk_cheesecake_nrf_p00`，`MinSizeRel`
+
+脚本不会调用 `bootstrap.sh`、`west update`、安装依赖或烧录设备。默认使用
+`--pristine=auto`，因此第一次运行会配置构建目录，后续运行可增量构建。修改
+板级配置、切换 SDK 或怀疑 CMake 缓存失效时，可强制重新配置 app：
+
+```bash
+./scripts/build-sk-cheesecake-nrf-p00.sh --pristine
+```
+
+如果当前终端已经激活兼容的 NCS/Zephyr Toolchain 环境，脚本会直接使用其中的
+`west` 和 Zephyr SDK。在普通终端运行时，脚本会从
+`~/ncs/toolchains/toolchains.json` 中自动选择已安装的 v3.2.x 工具链。非默认
+安装位置可以显式指定：
+
+```bash
+NCS_TOOLCHAIN_ROOT=/path/to/ncs/toolchain \
+  ./scripts/build-sk-cheesecake-nrf-p00.sh
+```
+
+自动选择只负责加载已安装的工具链，不会下载或修改工具链。单独激活
+`.venv-west` 仍不等同于完整构建环境；脚本发现缺少 Zephyr SDK 时会继续尝试
+已安装的 NCS Toolchain。app 的 ccache 默认放在
+`build/sk_cheesecake_nrf_p00/.ccache`，不会依赖用户目录可写。
+
+中间构建文件位于 `build/sk_cheesecake_nrf_p00/`。成功后可烧录或发布的文件
+统一复制到 `artifacts/sk_cheesecake_nrf_p00/`：
+
+```text
+app.uf2
+app.hex
+app-merged.hex
+bootloader_mbr.uf2
+bootloader_mbr.hex
+SHA256SUMS
+```
+
+`app-merged.hex` 是 west sysbuild 生成的合并 HEX；日常 UF2 更新通常使用
+`app.uf2`。bootloader 产物包含 MBR，优先使用 `bootloader_mbr.uf2` 或
+`bootloader_mbr.hex`。脚本不会复制具有异常大逻辑尺寸的 `bootloader.bin`。
+
 ## Bootloader 构建
 
-bootloader 不需要激活 west 环境。推荐从顶层配置独立构建目录，并显式使用
+同时构建 app 和 bootloader 时，推荐使用上一节的一键脚本。只需要手动构建
+bootloader 时，不需要激活 west 环境；从顶层配置独立构建目录，并显式使用
 `.venv-bootloader`：
 
 ```bash
