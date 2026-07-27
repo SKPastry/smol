@@ -16,7 +16,8 @@ smol/
 ├── tracker/
 │   └── SlimeVR-Tracker-nRF/                # Git 子模块 + west manifest
 └── scripts/
-    └── bootstrap.sh
+    ├── bootstrap.sh
+    └── update-sources.sh
 ```
 
 `recv` 和 `tracker` 是彼此独立的 west 工作区。`west update` 生成的
@@ -135,19 +136,96 @@ CMake 构建目录包含绝对路径，不应提交或复制到其他 clone。
 `git submodule update --init`；它不会初始化 bootloader 和 tracker 的内部
 子模块。
 
-有意升级到 `.gitmodules` 中配置分支的最新版本：
+如果需要升级到 `.gitmodules` 中配置分支的最新版本，请使用下一节的
+`update-sources.sh`，不要在有未提交开发内容时直接执行
+`git submodule update --remote`。
+
+## 更新源码分支
+
+`.gitmodules` 为三个顶层源码仓库配置了跟踪分支：
+
+- bootloader：`devc`
+- receiver：`dev`
+- tracker：`dev-p0`
+
+从这些远端分支安全更新顶层子模块：
 
 ```bash
-git submodule update --remote \
+./scripts/update-sources.sh
+```
+
+脚本会执行以下保护：
+
+1. 要求父仓库在三个子模块路径之外没有其他修改；
+2. 要求三个子模块没有未提交或未跟踪文件；
+3. 如果子模块正处于其他功能分支，则停止而不切换分支；
+4. 如果跟踪分支包含未推送提交或已经和远端分叉，则停止；
+5. 只允许 fast-forward，不执行 rebase、reset 或强制检出；
+6. 更新顶层源码后，将内部子模块恢复到新源码记录的固定提交；
+7. 只显示父仓库的 gitlink 变化，不自动提交或推送。
+
+更新中断后可以再次运行脚本。已经 fast-forward 的子模块会保持在远端分支
+提交，脚本继续检查其他仓库；它不会通过删除目录或 reset 来修复冲突。
+
+更新后先检查和测试：
+
+```bash
+git diff --submodule
+git status
+```
+
+确认三个固件仍能正常构建后，再提交父仓库记录的新引用：
+
+```bash
+git add \
   boot/Adafruit_nRF52_Bootloader \
   recv/SlimeVR-Tracker-nRF-Receiver \
   tracker/SlimeVR-Tracker-nRF
-git diff --submodule
+git commit -m "Update firmware sources"
+git push origin main
 ```
 
-升级顶层源码引用后，应再次执行 `./scripts/bootstrap.sh --init-only`，使内部
-子模块与新的源码提交一致。确认变更后，需要在本仓库提交更新后的顶层子模块
-引用。
+父仓库固定的是具体 commit，而不是每次 clone 时自动取得分支最新版本。因此，
+只有在明确准备升级并完成测试时才应运行更新脚本。
+
+## 在子模块中开发
+
+可以直接把任意子模块作为独立项目文件夹打开。它们仍是完整 Git 仓库，编辑、
+构建、创建分支、提交和推送都按各自项目的原有流程进行；顶层虚拟环境和 west
+工作区不会改变其中受版本控制的文件。
+
+推荐流程：
+
+```bash
+cd tracker/SlimeVR-Tracker-nRF
+git switch -c feature/my-change
+
+# 编辑、构建和测试
+git add -p
+git commit -m "Describe tracker change"
+git push -u origin feature/my-change
+```
+
+功能分支合并到 `.gitmodules` 配置的跟踪分支后，回到父仓库运行：
+
+```bash
+cd ../..
+./scripts/update-sources.sh
+```
+
+如果直接在跟踪分支开发，也必须先在子模块中提交并推送，再在父仓库中提交
+更新后的子模块引用。不要让父仓库引用一个尚未推送的子模块 commit，否则其他
+用户无法通过 `git submodule update` 取得它。
+
+需要注意：
+
+- 父仓库只记录子模块 commit，不会把子模块文件内容纳入父仓库提交。
+- 子模块存在未提交修改时，父仓库的 `git status` 会显示对应路径已修改。
+- `git submodule update` 和 `bootstrap.sh` 可能把干净的子模块切换到父仓库
+  固定的 commit，并进入 detached HEAD；分支和提交不会被删除，但继续开发前
+  应先用 `git switch` 返回准备开发的分支。
+- `update-sources.sh` 遇到活动中的其他分支、本地提交或未提交修改会停止，
+  不会覆盖开发现场。
 
 ## 工具链说明
 
