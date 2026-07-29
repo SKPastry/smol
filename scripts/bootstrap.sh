@@ -69,7 +69,8 @@ git submodule update --init \
     boot/Adafruit_nRF52_Bootloader \
     recv/SlimeVR-Tracker-nRF-Receiver \
     tracker/SlimeVR-Tracker-nRF \
-    web/slimenrf-ota-web
+    web/slimenrf-ota-web \
+    web/slimenrf-remote-command
 
 log "initializing direct bootloader dependencies"
 git -C boot/Adafruit_nRF52_Bootloader submodule sync

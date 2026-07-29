@@ -16,11 +16,15 @@ smol/
 ├── tracker/
 │   └── SlimeVR-Tracker-nRF/                # Git 子模块 + west manifest
 ├── web/
-│   └── slimenrf-ota-web/                    # 实机发布页面 Git 子模块
+│   ├── slimenrf-ota-web/                    # OTA 页面 Git 子模块（零源码修改）
+│   └── slimenrf-remote-command/             # 远程命令页面 Git 子模块
 └── scripts/
     ├── bootstrap.sh
     ├── build-sk-cheesecake-nrf-p00.sh
+    ├── build-web.sh
     ├── clean-sk-cheesecake-nrf-p00.sh
+    ├── compose-web.mjs
+    ├── deploy-web.sh
     └── update-sources.sh
 ```
 
@@ -47,7 +51,7 @@ cd smol
 
 不需要给 `git clone` 增加 `--recurse-submodules`。初始化脚本会：
 
-1. 拉取四个顶层源码子模块；
+1. 拉取五个顶层源码子模块；
 2. 只初始化 bootloader 的直接依赖，避免递归拉取 TinyUSB 中无关的平台仓库；
 3. 递归初始化 tracker 的 `vqf-c` 依赖；
 4. 创建 `.venv-west` 并安装固定版本的 `west`；
@@ -224,14 +228,14 @@ CMake 构建目录包含绝对路径，不应提交或复制到其他 clone。
 
 ## 日常同步
 
-完整初始化四个源码仓库、bootloader 直接依赖、tracker 的 `vqf-c` 和 west
+完整初始化五个源码仓库、bootloader 直接依赖、tracker 的 `vqf-c` 和 west
 元数据：
 
 ```bash
 ./scripts/bootstrap.sh --init-only
 ```
 
-如果只需要恢复顶层仓库记录的四个直接子模块，可以使用
+如果只需要恢复顶层仓库记录的五个直接子模块，可以使用
 `git submodule update --init`；它不会初始化 bootloader 和 tracker 的内部
 子模块。
 
@@ -241,12 +245,13 @@ CMake 构建目录包含绝对路径，不应提交或复制到其他 clone。
 
 ## 更新源码分支
 
-`.gitmodules` 为四个顶层源码仓库配置了跟踪分支：
+`.gitmodules` 为五个顶层源码仓库配置了跟踪分支：
 
 - bootloader：`devc`
 - receiver：`devc`
 - tracker：`devc`
 - 实机发布页面：`SKPastry`
+- 远程命令页面：`main`
 
 从这些远端分支安全更新顶层子模块：
 
@@ -256,8 +261,8 @@ CMake 构建目录包含绝对路径，不应提交或复制到其他 clone。
 
 脚本会执行以下保护：
 
-1. 要求父仓库在四个子模块路径之外没有其他修改；
-2. 要求四个子模块没有未提交或未跟踪文件；
+1. 要求父仓库在五个子模块路径之外没有其他修改；
+2. 要求五个子模块没有未提交或未跟踪文件；
 3. 如果子模块正处于其他功能分支，则停止而不切换分支；
 4. 如果跟踪分支包含未推送提交或已经和远端分叉，则停止；
 5. 只允许 fast-forward，不执行 rebase、reset 或强制检出；
@@ -282,7 +287,8 @@ git add \
   boot/Adafruit_nRF52_Bootloader \
   recv/SlimeVR-Tracker-nRF-Receiver \
   tracker/SlimeVR-Tracker-nRF \
-  web/slimenrf-ota-web
+  web/slimenrf-ota-web \
+  web/slimenrf-remote-command
 git commit -m "Update workspace sources"
 git push origin main
 ```
@@ -328,6 +334,47 @@ cd ../..
   应先用 `git switch` 返回准备开发的分支。
 - `update-sources.sh` 遇到活动中的其他分支、本地提交或未提交修改会停止，
   不会覆盖开发现场。
+
+## Web 页面组合构建
+
+远程命令页面由独立仓库维护，并作为顶层 Git 子模块固定在
+`web/slimenrf-remote-command/`。它只通过 `js/upstream-adapter.js` 使用 OTA
+子模块的 WebHID 协议能力，其余页面、命令目录、Web Serial、样式和翻译全部
+独立。
+
+首次构建前分别安装依赖：
+
+```bash
+pnpm --dir web/slimenrf-ota-web install --frozen-lockfile
+pnpm --dir web/slimenrf-remote-command install --frozen-lockfile
+```
+
+从根目录生成组合站点：
+
+```bash
+./scripts/build-web.sh
+```
+
+脚本先原样构建 OTA 子模块，再测试和构建远程命令页面，最后只在被忽略的
+`web/slimenrf-ota-web/dist/` 中完成组合：
+
+- `/` 保持原 OTA 页面；
+- `/commands/` 为远程命令页面；
+- 生成的 OTA `index.html` 获得一个带唯一标记的命令页入口；
+- 上游导航插入点不再唯一时构建失败；
+- 构建前后都要求 `slimenrf-ota-web` 源码工作树干净。
+
+组合产物仍从 OTA 子模块目录使用原有 `wrangler.toml` 和 `functions/` 部署。
+部署目标必须显式指定，脚本不会默认发布到生产环境：
+
+```bash
+./scripts/deploy-web.sh staging
+./scripts/deploy-web.sh production
+```
+
+远程命令首版只允许命令目录中登记的操作，并使用 Web Serial 逐台发送
+`send <id> <command>`。页面中的“已写入”是接收器控制台写入结果，不是 Tracker
+执行 ACK。
 
 ## 工具链说明
 

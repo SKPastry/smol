@@ -14,3 +14,7 @@
 	path = web/slimenrf-ota-web
 	url = https://github.com/SKPastry/slimenrf-ota-web.git
 	branch = SKPastry
+[submodule "web/slimenrf-remote-command"]
+	path = web/slimenrf-remote-command
+	url = https://github.com/SKPastry/slimenrf-remote-command.git
+	branch = main

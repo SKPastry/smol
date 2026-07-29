@@ -9,6 +9,7 @@ readonly SOURCE_PATHS=(
     "recv/SlimeVR-Tracker-nRF-Receiver"
     "tracker/SlimeVR-Tracker-nRF"
     "web/slimenrf-ota-web"
+    "web/slimenrf-remote-command"
 )
 
 log() {
@@ -38,7 +39,7 @@ usage() {
     cat <<'EOF'
 Usage: ./scripts/update-sources.sh
 
-Fast-forward the four top-level source submodules to the remote branches
+Fast-forward the five top-level source submodules to the remote branches
 configured in .gitmodules, then synchronize their nested submodules.
 EOF
 }
@@ -58,17 +59,19 @@ fi
 
 require_parent_files_clean() {
     local status
+    local path
+    local pathspecs=(.)
+
+    for path in "${SOURCE_PATHS[@]}"; do
+        pathspecs+=(":(exclude)${path}")
+    done
 
     status="$(
         git -C "${ROOT_DIR}" status \
             --porcelain \
             --untracked-files=all \
             -- \
-            . \
-            ":(exclude)${SOURCE_PATHS[0]}" \
-            ":(exclude)${SOURCE_PATHS[1]}" \
-            ":(exclude)${SOURCE_PATHS[2]}" \
-            ":(exclude)${SOURCE_PATHS[3]}"
+            "${pathspecs[@]}"
     )"
 
     [[ -z "${status}" ]] || {

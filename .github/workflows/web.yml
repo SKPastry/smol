@@ -1,0 +1,60 @@
+name: Web
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/web.yml'
+      - 'scripts/build-web.sh'
+      - 'scripts/compose-web.mjs'
+      - 'web/slimenrf-ota-web'
+      - 'web/slimenrf-remote-command'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/web.yml'
+      - 'scripts/build-web.sh'
+      - 'scripts/compose-web.mjs'
+      - 'web/slimenrf-ota-web'
+      - 'web/slimenrf-remote-command'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Initialize web submodules
+        run: |
+          git submodule update --init web/slimenrf-ota-web
+          git submodule update --init web/slimenrf-remote-command
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            web/slimenrf-ota-web/pnpm-lock.yaml
+            web/slimenrf-remote-command/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: |
+          pnpm --dir web/slimenrf-ota-web install --frozen-lockfile
+          pnpm --dir web/slimenrf-remote-command install --frozen-lockfile
+
+      - name: Build composite site
+        run: ./scripts/build-web.sh
+
+      - name: Confirm upstream source is unchanged
+        run: |
+          git -C web/slimenrf-ota-web diff --exit-code
+          git -C web/slimenrf-remote-command diff --exit-code
