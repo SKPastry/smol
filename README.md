@@ -372,9 +372,10 @@ pnpm --dir web/slimenrf-remote-command install --frozen-lockfile
 ./scripts/deploy-web.sh production
 ```
 
-远程命令首版只允许命令目录中登记的操作，并使用 Web Serial 逐台发送
-`send <id> <command>`。页面中的“已写入”是接收器控制台写入结果，不是 Tracker
-执行 ACK。
+远程命令首版只允许命令目录中登记的操作。选中全部在线 Tracker 时使用 Web
+Serial 发送一条 `send all <command>`；部分选择仍逐台发送
+`send <id> <command>`。页面中的“已写入”是接收器控制台写入结果，不是
+Tracker 执行 ACK。
 
 ## 工具链说明
 
