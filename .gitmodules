@@ -10,3 +10,7 @@
 	path = tracker/SlimeVR-Tracker-nRF
 	url = https://github.com/SKPastry/SlimeVR-Tracker-nRF.git
 	branch = dev-p0
+[submodule "web/slimenrf-ota-web"]
+	path = web/slimenrf-ota-web
+	url = https://github.com/SKPastry/slimenrf-ota-web.git
+	branch = SKPastry

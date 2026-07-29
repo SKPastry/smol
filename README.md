@@ -15,6 +15,8 @@ smol/
 │   └── SlimeVR-Tracker-nRF-Receiver/       # Git 子模块 + west manifest
 ├── tracker/
 │   └── SlimeVR-Tracker-nRF/                # Git 子模块 + west manifest
+├── web/
+│   └── slimenrf-ota-web/                    # 实机发布页面 Git 子模块
 └── scripts/
     ├── bootstrap.sh
     ├── build-sk-cheesecake-nrf-p00.sh
@@ -45,7 +47,7 @@ cd smol
 
 不需要给 `git clone` 增加 `--recurse-submodules`。初始化脚本会：
 
-1. 拉取三个顶层源码子模块；
+1. 拉取四个顶层源码子模块；
 2. 只初始化 bootloader 的直接依赖，避免递归拉取 TinyUSB 中无关的平台仓库；
 3. 递归初始化 tracker 的 `vqf-c` 依赖；
 4. 创建 `.venv-west` 并安装固定版本的 `west`；
@@ -222,14 +224,14 @@ CMake 构建目录包含绝对路径，不应提交或复制到其他 clone。
 
 ## 日常同步
 
-完整初始化三个源码仓库、bootloader 直接依赖、tracker 的 `vqf-c` 和 west
+完整初始化四个源码仓库、bootloader 直接依赖、tracker 的 `vqf-c` 和 west
 元数据：
 
 ```bash
 ./scripts/bootstrap.sh --init-only
 ```
 
-如果只需要恢复顶层仓库记录的三个直接子模块，可以使用
+如果只需要恢复顶层仓库记录的四个直接子模块，可以使用
 `git submodule update --init`；它不会初始化 bootloader 和 tracker 的内部
 子模块。
 
@@ -239,11 +241,12 @@ CMake 构建目录包含绝对路径，不应提交或复制到其他 clone。
 
 ## 更新源码分支
 
-`.gitmodules` 为三个顶层源码仓库配置了跟踪分支：
+`.gitmodules` 为四个顶层源码仓库配置了跟踪分支：
 
 - bootloader：`devc`
 - receiver：`dev`
 - tracker：`dev-p0`
+- 实机发布页面：`SKPastry`
 
 从这些远端分支安全更新顶层子模块：
 
@@ -253,8 +256,8 @@ CMake 构建目录包含绝对路径，不应提交或复制到其他 clone。
 
 脚本会执行以下保护：
 
-1. 要求父仓库在三个子模块路径之外没有其他修改；
-2. 要求三个子模块没有未提交或未跟踪文件；
+1. 要求父仓库在四个子模块路径之外没有其他修改；
+2. 要求四个子模块没有未提交或未跟踪文件；
 3. 如果子模块正处于其他功能分支，则停止而不切换分支；
 4. 如果跟踪分支包含未推送提交或已经和远端分叉，则停止；
 5. 只允许 fast-forward，不执行 rebase、reset 或强制检出；
@@ -271,14 +274,16 @@ git diff --submodule
 git status
 ```
 
-确认三个固件仍能正常构建后，再提交父仓库记录的新引用：
+确认三个固件仍能正常构建、实机发布页面测试通过后，再提交父仓库记录的新
+引用：
 
 ```bash
 git add \
   boot/Adafruit_nRF52_Bootloader \
   recv/SlimeVR-Tracker-nRF-Receiver \
-  tracker/SlimeVR-Tracker-nRF
-git commit -m "Update firmware sources"
+  tracker/SlimeVR-Tracker-nRF \
+  web/slimenrf-ota-web
+git commit -m "Update workspace sources"
 git push origin main
 ```
 

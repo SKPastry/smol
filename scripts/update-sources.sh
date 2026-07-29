@@ -8,6 +8,7 @@ readonly SOURCE_PATHS=(
     "boot/Adafruit_nRF52_Bootloader"
     "recv/SlimeVR-Tracker-nRF-Receiver"
     "tracker/SlimeVR-Tracker-nRF"
+    "web/slimenrf-ota-web"
 )
 
 log() {
@@ -37,7 +38,7 @@ usage() {
     cat <<'EOF'
 Usage: ./scripts/update-sources.sh
 
-Fast-forward the three top-level source submodules to the remote branches
+Fast-forward the four top-level source submodules to the remote branches
 configured in .gitmodules, then synchronize their nested submodules.
 EOF
 }
@@ -66,7 +67,8 @@ require_parent_files_clean() {
             . \
             ":(exclude)${SOURCE_PATHS[0]}" \
             ":(exclude)${SOURCE_PATHS[1]}" \
-            ":(exclude)${SOURCE_PATHS[2]}"
+            ":(exclude)${SOURCE_PATHS[2]}" \
+            ":(exclude)${SOURCE_PATHS[3]}"
     )"
 
     [[ -z "${status}" ]] || {
