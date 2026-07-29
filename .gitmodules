@@ -5,11 +5,11 @@
 [submodule "recv/SlimeVR-Tracker-nRF-Receiver"]
 	path = recv/SlimeVR-Tracker-nRF-Receiver
 	url = https://github.com/SKPastry/SlimeVR-Tracker-nRF-Receiver.git
-	branch = dev
+	branch = devc
 [submodule "tracker/SlimeVR-Tracker-nRF"]
 	path = tracker/SlimeVR-Tracker-nRF
 	url = https://github.com/SKPastry/SlimeVR-Tracker-nRF.git
-	branch = dev-p0
+	branch = devc
 [submodule "web/slimenrf-ota-web"]
 	path = web/slimenrf-ota-web
 	url = https://github.com/SKPastry/slimenrf-ota-web.git

@@ -244,8 +244,8 @@ CMake 构建目录包含绝对路径，不应提交或复制到其他 clone。
 `.gitmodules` 为四个顶层源码仓库配置了跟踪分支：
 
 - bootloader：`devc`
-- receiver：`dev`
-- tracker：`dev-p0`
+- receiver：`devc`
+- tracker：`devc`
 - 实机发布页面：`SKPastry`
 
 从这些远端分支安全更新顶层子模块：
